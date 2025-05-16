@@ -35,10 +35,17 @@ def train(model: torch.nn.Module , train_loader: torch.utils.data.DataLoader,
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
     history = {'acc_train' : [], 'loss_train': [], 'acc_val': [], 'loss_val': []}
+    
+    if device.type != 'cpu':
+        model = model.to(device)
+        criterion = criterion.to(device)
+        print('Using GPU')
 
     for e in tqdm(range(1, epochs+1)):
 
         y_hat = np.array([])
+        # if device.type == 'cuda':
+        y_hat = torch.Tensor(y_hat).to(device)
 
         train_epoch_loss = 0
         train_epoch_acc = 0
@@ -61,11 +68,12 @@ def train(model: torch.nn.Module , train_loader: torch.utils.data.DataLoader,
             train_epoch_loss += loss.item()
             train_epoch_acc += acc.item()
             y_p = torch.argmax(y_pred, dim=1)
-            y_hat = np.concatenate((y_hat, y_p))
+            # y_hat = np.concatenate((y_hat, y_p))
+            y_hat = torch.cat((y_hat, y_p), dim=0)
 
 
         model.eval()
-        _, val_loss, val_acc = evaluate(model, val_set, criterion, binary=binary)
+        _, val_loss, val_acc = evaluate(model, val_set, criterion, binary=binary, device=device)
 
         history['acc_train'].append(train_epoch_acc/len(train_loader))
         history['loss_train'].append(train_epoch_loss/len(train_loader))
@@ -78,7 +86,7 @@ def train(model: torch.nn.Module , train_loader: torch.utils.data.DataLoader,
 
 
 def evaluate(model: torch.nn.Module, val_set: Tuple[torch.tensor, torch.tensor], 
-            criterion: torch.nn.Module, binary:bool =True) -> Tuple[torch.tensor, float, float]:
+            criterion: torch.nn.Module, binary:bool =True, device: torch.device='cpu') -> Tuple[torch.tensor, float, float]:
     """
     Evaluates a Pytorch model on a given dataset.
     Parameters:
@@ -90,8 +98,8 @@ def evaluate(model: torch.nn.Module, val_set: Tuple[torch.tensor, torch.tensor],
     tuple: A tuple containing predicted labels, loss, and accuracy
     """
     
-    X = val_set.X_data
-    y = val_set.y_data
+    X = val_set.X_data.to(device)
+    y = val_set.y_data.to(device)
     
     with torch.no_grad():
         y_pred = model(X)
